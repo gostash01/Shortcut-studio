@@ -1,0 +1,226 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShortCut Studio</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101323;color:white;font-family:Arial,sans-serif;padding:20px}
+header{text-align:center;padding:20px 0}
+h1{color:#8b7cff;font-size:30px}
+p{color:#bbb}
+.card{background:#1c2238;padding:18px;border-radius:15px;margin:18px 0}
+video{width:100%;border-radius:10px;background:#000;margin-top:15px}
+input{width:100%;padding:13px;margin:10px 0;border-radius:8px;border:1px solid #555;background:#292f46;color:white}
+button{width:100%;padding:15px;border:0;border-radius:9px;background:#7865ff;color:white;font-weight:bold;font-size:16px;margin-top:12px}
+button:disabled{opacity:.5}
+label{display:block;margin-top:12px}
+#status{color:#9e91ff;text-align:center;margin-top:15px}
+a{color:#a99cff}
+</style>
+</head>
+<body
+><section id="youtube-import">
+  <h2>Import YouTube Video</h2>
+  <input type="url" id="youtubeLink"
+    placeholder="Paste YouTube video link here">
+  <button onclick="loadYouTubeVideo()">Load Video</button>
+  <div id="youtubePlayer"></div>
+</section>
+<section id="youtube-import">
+  <h2>Import YouTube Video</h2>
+  <input
+    type="url"
+    id="youtubeLink"
+    placeholder="Paste YouTube video link here"
+  >
+  <button onclick="loadYouTubeVideo()">Load Video</button>
+  <div id="youtubePlayer"></div>
+</section>
+<header>
+<h1>✂️ ShortCut Studio</h1>
+<p>Your free video clipping studio</p>
+</header>
+
+<div class="card">
+<h3>1. Upload your video</h3>
+<input type="file" id="upload" accept="video/*">
+<video id="video" controls playsinline></video>
+</div>
+
+<div class="card">
+<h3>2. Select your clip</h3>
+
+<label>Start time (seconds)</label>
+<input type="number" id="start" value="0" min="0" step="0.1">
+
+<label>End time (seconds)</label>
+<input type="number" id="end" value="10" min="0" step="0.1">
+
+<button onclick="previewClip()">Preview selected clip</button>
+</div>
+
+<div class="card">
+<h3>3. Export your clip</h3>
+<button id="export" onclick="exportClip()">Export video</button>
+<p id="status">Your video is ready to edit.</p>
+<a id="download"></a>
+</div>
+
+<script
+>function loadYouTubeVideo() {
+  const link = document.getElementById("youtubeLink").value;
+  const player = document.getElementById("youtubePlayer");
+
+  const match = link.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+
+  if (!match) {
+    alert("Please enter a valid YouTube link.");
+    return;
+  }
+
+  player.innerHTML = `
+    <iframe
+      width="100%"
+      height="250"
+      src="https://www.youtube.com/embed/${match[1]}"
+      allowfullscreen>
+    </iframe>
+  `;
+}
+const video=document.getElementById("video");
+const upload=document.getElementById("upload");
+const start=document.getElementById("start");
+const end=document.getElementById("end");
+const status=document.getElementById("status");
+const download=document.getElementById("download");
+
+upload.onchange=()=>{
+const file=upload.files[0];
+if(!file)return;
+video.src=URL.createObjectURL(file);
+video.onloadedmetadata=()=>{
+start.value=0;
+end.value=Math.floor(video.duration);
+status.textContent="Video loaded successfully!";
+};
+};
+
+function previewClip(){
+if(!video.src)return alert("Upload a video first.");
+const s=Number(start.value);
+const e=Number(end.value);
+if(s<0||e<=s||e>video.duration)
+return alert("Enter valid start and end times.");
+video.currentTime=s;
+video.play();
+const stop=()=>{
+if(video.currentTime>=e){
+video.pause();
+video.removeEventListener("timeupdate",stop);
+}
+};
+video.addEventListener("timeupdate",stop);
+}
+
+async function exportClip(){
+function previewClip() {
+  if (!video.src || !Number.isFinite(video.duration)) {
+    alert("Upload a video first.");
+    return;
+  }
+
+  const s = Number(start.value);
+  const e = Number(end.value);
+
+  if (!Number.isFinite(s) || !Number.isFinite(e) || s < 0 || e <= s || e > video.duration) {
+    alert("Enter valid clip times.");
+    return;
+  }
+
+  video.pause();
+  video.currentTime = s;
+
+  const stopPreview = () => {
+    if (video.currentTime >= e) {
+      video.pause();
+      video.removeEventListener("timeupdate", stopPreview);
+    }
+  };
+
+  video.addEventListener("timeupdate", stopPreview);
+  video.play();
+}
+
+if(!video.src)return alert("Upload a video first.");
+
+const s=Number(start.value);
+const e=Number(end.value);
+
+if(s<0||e<=s||e>video.duration)
+return alert("Enter valid clip times.");
+
+if(!video.captureStream||!window.MediaRecorder)
+return alert("Your browser does not support video exporting. Try Chrome.");
+
+const btn=document.getElementById("export");
+btn.disabled=true;
+download.textContent="";
+status.textContent="Preparing your clip...";
+
+try{
+video.pause();
+video.currentTime=s;
+
+await new Promise(resolve=>{
+video.onseeked=resolve;
+});
+
+const stream=video.captureStream();
+const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+?"video/webm;codecs=vp9":"video/webm";
+
+const recorder=new MediaRecorder(stream,{mimeType:mime});
+const chunks=[];
+
+recorder.ondataavailable=event=>{
+if(event.data.size)chunks.push(event.data);
+};
+
+recorder.onstop=()=>{
+const blob=new Blob(chunks,{type:"video/webm"});
+const url=URL.createObjectURL(blob);
+download.href=url;
+download.download="shortcut-studio-clip.webm";
+download.textContent="⬇ Download your clip";
+status.textContent="Your clip is ready!";
+btn.disabled=false;
+};
+
+recorder.start();
+await video.play();
+
+const check=()=>{
+if(video.currentTime>=e||video.ended){
+video.pause();
+recorder.stop();
+return;
+}
+requestAnimationFrame(check);
+};
+
+requestAnimationFrame(check);
+status.textContent="Exporting your clip... Please wait.";
+
+}catch(error){
+status.textContent="Export failed. Try another video or Chrome.";
+btn.disabled=false;
+}
+}
+</script>
+</body>
+</html>
